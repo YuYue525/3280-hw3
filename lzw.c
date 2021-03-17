@@ -25,10 +25,10 @@
 #define FALSE 0
 
 #define MAX_TREE_NODES 4096
-
+unsigned int current_code = 0;
 
 /* function prototypes */
-
+/*
 struct TreeNode
 {
     char c;
@@ -53,6 +53,41 @@ void initTree(Tree tree)
         }
     }
 }
+*/
+struct TreeNode
+{
+    char c;
+    int pre_node;
+    int next_node;
+    int son_node;
+};
+
+typedef struct TreeNode Tree[MAX_TREE_NODES];
+
+void initTree(Tree tree)
+{
+    for(int i =0; i<MAX_TREE_NODES; i++)
+    {
+        if(i<256)
+        {
+            tree[i].c = i;
+            tree[i].pre_node = MAX_TREE_NODES - 1;
+            if(i!=255)
+                tree[i].next_node = i+1;
+            else
+                tree[i].next_node = -1;
+            tree[i].son_node = -1;
+        }
+        else
+        {
+            tree[i].c = '\0';
+            tree[i].pre_node = MAX_TREE_NODES - 1;
+            tree[i].next_node = -1;
+            tree[i].next_node = -1;
+        }
+    }
+    current_code = 256;
+}
 
 unsigned int read_code(FILE*, unsigned int); 
 void write_code(FILE*, unsigned int, unsigned int); 
@@ -60,18 +95,35 @@ void writefileheader(FILE *,char**,int);
 void readfileheader(FILE *,char**,int *);
 void compress(FILE*, FILE*, Tree);
 void decompress(FILE*, FILE*, Tree);
-
+/*
 struct TextChar
 {
     char c;
     struct TextChar * pre_char;
+};*/
+struct TextChar
+{
+    char c;
+    struct TextChar * pre_char;
+    struct TextChar * next_char;
 };
-
+/*
 struct TextChar * append(struct TextChar * P, char C)
 {
     struct TextChar * newC = (struct TextChar*)malloc(sizeof(struct TextChar));
     newC -> c = C;
     newC -> pre_char = P;
+    return newC;
+}
+*/
+struct TextChar * append(struct TextChar * P, char C)
+{
+    struct TextChar * newC = (struct TextChar*)malloc(sizeof(struct TextChar));
+    newC -> c = C;
+    newC -> pre_char = P;
+    newC -> next_char = NULL;
+    if(P != NULL)
+        P -> next_char = newC;
     return newC;
 }
 
@@ -101,6 +153,16 @@ int isFound(Tree tree, unsigned int code, struct TextChar * T)
     return 0;
 }
 
+struct TextChar * firstChar(struct TextChar * P)
+{
+    if(P == NULL)
+        return NULL;
+    if(P -> pre_char == NULL)
+        return P;
+    return firstChar(P -> pre_char);
+}
+
+/*
 int findCode(struct TextChar * T, Tree tree)
 {
     for(int i = 0; i<MAX_TREE_NODES-1; i++)
@@ -109,6 +171,35 @@ int findCode(struct TextChar * T, Tree tree)
             return -1;
         if(isFound(tree, i, T))
             return i;
+    }
+    return -1;
+}
+*/
+int findCode(struct TextChar * T, Tree tree)
+{
+    int pos = 0;
+    struct TextChar * first = firstChar(T);
+    while(1)
+    {
+        if(tree[pos].c != first->c)
+        {
+            if(tree[pos].next_node != -1)
+                pos = tree[pos].next_node;
+            else
+                return -1;
+        }
+        else if(first == T)
+            return pos;
+        else if(first->next_char !=NULL && tree[pos].son_node != -1)
+        {
+            first = first->next_char;
+            pos = tree[pos].son_node;
+        }
+        else if(first->next_char == NULL)
+            return pos;
+        else
+            return -1;
+       
     }
     return -1;
 }
@@ -122,7 +213,7 @@ struct TextChar * findStr(unsigned int code, Tree tree)
         previous = findStr(tree[code].pre_node, tree);
     return append(previous, tree[code].c);
 }
-
+/*
 int addNode(struct TextChar * P, char C, Tree tree)
 {
     for (unsigned int i = 0; i < MAX_TREE_NODES-1; i++)
@@ -141,16 +232,40 @@ int addNode(struct TextChar * P, char C, Tree tree)
     initTree(tree);
     return addNode(P, C, tree);
 }
-
-
-struct TextChar * firstChar(struct TextChar * P)
+*/
+int addNode(struct TextChar * P, char C, Tree tree)
 {
-    if(P == NULL)
-        return NULL;
-    if(P -> pre_char == NULL)
-        return P;
-    return firstChar(P -> pre_char);
+    
+    if(current_code <MAX_TREE_NODES -1)
+    {
+        tree[current_code].c = C;
+        struct TextChar * f = firstChar(P);
+        int pre_code = findCode(f, tree);
+        if (pre_code == -1)
+            pre_code = addNode(P->pre_char, P->c, tree);
+        tree[current_code].pre_node = pre_code;
+        if(tree[pre_code].son_node == -1)
+            tree[pre_code].son_node = current_code;
+        else
+        {
+            int x = tree[tree[pre_code].son_node].next_node;
+            while( x!= -1)
+                x = tree[x].next_node;
+            tree[x].next_node = current_code;
+        }
+        tree[current_code].next_node = -1;
+        tree[current_code].son_node = -1;
+        current_code ++;
+        return current_code;
+        
+    }
+    else
+    {
+        initTree(tree);
+        return addNode(P, C, tree);
+    }
 }
+
 
 void outputStr(struct TextChar * P, FILE * output)
 {
