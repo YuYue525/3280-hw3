@@ -20,7 +20,6 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "bmp.h"
 
 #define CODE_SIZE  12
 #define TRUE 1
@@ -28,7 +27,6 @@
 
 #define MAX_TREE_NODES 4096
 
-unsigned int current_code = 0;
 
 /* function prototypes */
 
@@ -36,6 +34,8 @@ struct TreeNode
 {
     char c;
     int pre_node;
+    int next_node;
+    int son_node;
 };
 
 typedef struct TreeNode Tree[MAX_TREE_NODES];
@@ -46,16 +46,29 @@ void initTree(Tree tree)
     {
         if(i<256)
         {
-            tree[i].c = i;
+            tree[i].c = (char)i;
             tree[i].pre_node = MAX_TREE_NODES - 1;
+            if(i!=255)
+                tree[i].next_node = i+1;
+            else
+                tree[i].next_node = -1;
+            tree[i].son_node = -1;
+        }
+        else if(i == MAX_TREE_NODES-1)
+        {
+            tree[i].c = '\0';
+            tree[i].pre_node = MAX_TREE_NODES - 1;
+            tree[i].next_node = -1;
+            tree[i].son_node = 0;
         }
         else
         {
             tree[i].c = '\0';
-            tree[i].pre_node = MAX_TREE_NODES - 1;
+            tree[i].pre_node = -1;
+            tree[i].next_node = -1;
+            tree[i].son_node = -1;
         }
     }
-    current_code = 256;
 }
 
 unsigned int read_code(FILE*, unsigned int);
@@ -69,6 +82,7 @@ struct TextChar
 {
     char c;
     struct TextChar * pre_char;
+    struct TextChar * next_char;
 };
 
 struct TextChar * append(struct TextChar * P, char C)
@@ -76,61 +90,17 @@ struct TextChar * append(struct TextChar * P, char C)
     struct TextChar * newC = (struct TextChar*)malloc(sizeof(struct TextChar));
     newC -> c = C;
     newC -> pre_char = P;
+    newC -> next_char = NULL;
+    if(P != NULL)
+        P -> next_char = newC;
     return newC;
 }
 
-int isFound(Tree tree, unsigned int code, struct TextChar * T)
+int isEmptyNode( unsigned int i, Tree tree)
 {
-    struct TreeNode node = tree[code];
-    
-    while(1)
-    {
-        if(node.c != T->c)
-            return 0;
-        if(node.pre_node == MAX_TREE_NODES - 1 && T->pre_char == NULL)
-            return 1;
-        else
-            if(node.pre_node == MAX_TREE_NODES - 1 || T->pre_char == NULL)
-                return 0;
-        node = tree[node.pre_node];
-        T = T -> pre_char;
-    }
+    if(i != 0 && tree[i].c == '\0' && tree[i].pre_node == -1 )
+        return 1;
     return 0;
-}
-
-int findCode(struct TextChar * T, Tree tree)
-{
-    for(int i = 0; i<current_code; i++)
-        if(isFound(tree, i, T))
-            return i;
-    return -1;
-}
-
-struct TextChar * findStr(unsigned int code, Tree tree)
-{
-    if(current_code<=code)
-        return NULL;
-    struct TextChar * previous = NULL;
-    if(tree[code].pre_node != MAX_TREE_NODES - 1)
-        previous = findStr(tree[code].pre_node, tree);
-    return append(previous, tree[code].c);
-}
-
-int addNode(struct TextChar * P, char C, Tree tree)
-{
-
-    if (current_code<MAX_TREE_NODES-1)
-    {
-        current_code++;
-        tree[current_code-1].c = C;
-        int pre_code = findCode(P, tree);
-        if (pre_code == -1)
-            pre_code = addNode(P->pre_char, P->c, tree);
-        tree[current_code-1].pre_node = pre_code;
-        return current_code-1;
-    }
-    initTree(tree);
-    return addNode(P, C, tree);
 }
 
 
@@ -142,6 +112,95 @@ struct TextChar * firstChar(struct TextChar * P)
         return P;
     return firstChar(P -> pre_char);
 }
+
+int findCode(struct TextChar * T, Tree tree)
+{
+    int pos = 0;
+    struct TextChar * first = firstChar(T);
+    if(first == NULL)
+        return -1;
+    while(1)
+    {
+
+        if(tree[pos].c != first->c)
+        {
+            if(tree[pos].next_node != -1)
+            {
+                //printf("%d\n",pos);
+                pos = tree[pos].next_node;
+            }
+
+            else
+                return -1;
+        }
+        else if(first == T)
+            return pos;
+        else if(tree[pos].son_node != -1)
+        {
+            first = first->next_char;
+            pos = tree[pos].son_node;
+            //printf("%d\n",pos);
+        }
+        else
+            return -1;
+       
+    }
+    printf("never goes here");
+    return -1;
+}
+
+struct TextChar * findStr(unsigned int code, Tree tree)
+{
+    if(isEmptyNode(code, tree))
+        return NULL;
+    struct TextChar * previous = NULL;
+    if(tree[code].pre_node != MAX_TREE_NODES - 1)
+        previous = findStr(tree[code].pre_node, tree);
+    return append(previous, tree[code].c);
+}
+
+int addNode(struct TextChar * P, char C, Tree tree)
+{
+    for (unsigned int i = 0; i < MAX_TREE_NODES-1; i++)
+    {
+        if (isEmptyNode(i, tree)==1)
+        {
+            tree[i].c = C;
+            int pre_code = findCode(P, tree);
+            if (pre_code == -1)
+            {
+
+                pre_code = addNode(P->pre_char, P->c, tree);
+            }
+
+            tree[i].son_node = -1;
+            tree[i].next_node = -1;
+            tree[i].pre_node = pre_code;
+
+            if(tree[pre_code].son_node == -1)
+                tree[pre_code].son_node = i;
+            else
+            {
+                int x = tree[tree[pre_code].son_node].next_node;
+                int c = tree[pre_code].son_node;
+                while( x != -1)
+                {
+                    c = x;
+                    x = tree[c].next_node;
+                }
+
+                tree[c].next_node = i;
+            }
+            return i;
+        }
+    }
+
+    initTree(tree);
+    return addNode(P, C, tree);
+}
+
+
+
 
 void outputStr(struct TextChar * P, FILE * output)
 {
@@ -164,6 +223,7 @@ struct TextChar * newChar(char c)
     struct TextChar * new = (struct TextChar*)malloc(sizeof(struct TextChar));
     new->c = c;
     new->pre_char = NULL;
+    new->next_char = NULL;
     return new;
 }
 
@@ -178,19 +238,19 @@ int main(int argc, char **argv)
 
     Tree tree;
     initTree(tree);
-    
+
     if (argc >= 3)
     {
         if ( strcmp(argv[1],"-c") == 0)
         {
             /* compression */
             lzw_file = fopen(argv[2] ,"wb");
-        
+
             /* write the file header */
             input_file_names = argv + 3;
             no_of_file = argc - 3;
             writefileheader(lzw_file,input_file_names,no_of_file);
-                        
+
             /* ADD CODES HERE */
             for(int i = 0; i<no_of_file; i++)
             {
@@ -199,7 +259,7 @@ int main(int argc, char **argv)
                 fclose(input);
             }
             write_code(lzw_file, MAX_TREE_NODES-1, CODE_SIZE);
-            
+
             fclose(lzw_file);
         }else
         if ( strcmp(argv[1],"-d") == 0)
@@ -207,17 +267,17 @@ int main(int argc, char **argv)
 
             /* decompress */
             lzw_file = fopen(argv[2] ,"rb");
-            
+
             /* read the file header */
             no_of_file = 0;
             readfileheader(lzw_file,&output_file_names,&no_of_file);
-            
+
             /* ADD CODES HERE */
-            
+
             int file_num = 0;
             char * name;
             name = strtok(output_file_names,"\n");
-            
+
             while (name!=NULL)
             {
                 if(strlen(name)!=0)
@@ -227,12 +287,12 @@ int main(int argc, char **argv)
                     fclose(output);
                 }
                 file_num++;
-                
+
                 if(file_num>=no_of_file)
                     break;
                 name = strtok(NULL, "\n");
             }
-            
+
             fclose(lzw_file);
             free(output_file_names);
         }else
@@ -243,8 +303,6 @@ int main(int argc, char **argv)
     if (printusage)
         printf("Usage: %s -<c/d> <lzw filename> <list of files>\n",argv[0]);
 
-    printf("Do you want to compress images or ");
-     
     return 0;
 }
 
@@ -260,7 +318,7 @@ void writefileheader(FILE *lzw_file,char** input_file_names,int no_of_files)
     for ( i = 0 ; i < no_of_files; i++)
     {
         fprintf(lzw_file,"%s\n",input_file_names[i]);
-            
+
     }
     fputc('\n',lzw_file);
 
@@ -298,7 +356,7 @@ void readfileheader(FILE *lzw_file,char** output_filenames,int * no_of_files)
         /* problem .... file may have corrupted*/
         *no_of_files = 0;
         return;
-    
+
     }
     /* allocate memeory for the filenames */
     *output_filenames = (char *) malloc(sizeof(char)*noofchar);
@@ -306,7 +364,7 @@ void readfileheader(FILE *lzw_file,char** output_filenames,int * no_of_files)
     fseek(lzw_file,0,SEEK_SET);
 
     fread((*output_filenames),1,(size_t)noofchar,lzw_file);
-    
+
     return;
 }
 
@@ -331,11 +389,11 @@ unsigned int read_code(FILE *input, unsigned int code_size)
         input_bit_buffer |= (unsigned long) getc(input) << (24-input_bit_count);
         input_bit_count += 8;
     }
-    
+
     return_value = input_bit_buffer >> (32 - code_size);
     input_bit_buffer <<= code_size;
     input_bit_count -= code_size;
-    
+
     return(return_value);
 }
 
@@ -382,13 +440,13 @@ void compress(FILE *input, FILE *output, Tree tree)
     char C;
     struct TextChar * P = NULL;
     unsigned int X = 0;
-    
+
     while((C = fgetc(input))!=EOF)
     {
         struct TextChar * PC = append(P, C);
-        unsigned int code = findCode(PC, tree);
+        int code = findCode(PC, tree);
         free(PC);
-        
+
         if(code == -1)
         {
             unsigned int P_code = findCode(P, tree);
@@ -426,21 +484,21 @@ void decompress(FILE *input, FILE *output, Tree tree)
     struct TextChar * S = NULL;
     S = findStr(PW, tree);
     outputStr(S, output);
-    
+
     unsigned int CW = 0;
     char C;
 
     while((CW = read_code(input, CODE_SIZE))!= MAX_TREE_NODES -1)
     {
         freeText(S);
-        
+
         S = findStr(CW, tree);
-        
-        
+
+
         if(S != NULL)
         {
             outputStr(S, output);
-            
+
             struct TextChar * first_char = firstChar(S);
             C = first_char -> c;
 
@@ -461,5 +519,4 @@ void decompress(FILE *input, FILE *output, Tree tree)
         PW = CW;
     }
 }
-
 
