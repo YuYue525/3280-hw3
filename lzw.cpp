@@ -391,7 +391,7 @@ int main(int argc, char **argv)
                     const char * tmp_file_name = strcat(strtok(name, "."),".txt");
                     FILE * output = fopen(tmp_file_name, "r");
                     int height, width;
-                    int red, green , blue;
+                    int red =0, green=0 , blue=0;
                     printf("Please enter the height and the width of the %d-th image: <height> <width>\n", file_num+1);
                     scanf("%d %d", &height, &width);
                     getchar();
@@ -400,18 +400,17 @@ int main(int argc, char **argv)
                     {
                         for(int j = 0; j<width; j++)
                         {
-                            fscanf(output, "%d", &red);
-
-                            if(fgetc(output)!= ' ')
-                                printf("red");
-                            fscanf(output, "%d", &green);
-                            if(fgetc(output)!= ' ')
-                                printf("green");
-                            fscanf(output, "%d", &blue);
-                            if(fgetc(output)!= ' ')
-                                printf("blue");
+                            int num;
+                            
+                            while((num = fgetc(output))!=' ')
+                                red = red*10 +num-'0';
+                            while((num = fgetc(output))!=' ')
+                                green = green*10 +num-'0';
+                            while((num = fgetc(output))!=' ')
+                                blue = blue*10 +num-'0';
+                            
                             new_image.setColor(j, i, (unsigned char)red, (unsigned char)green, (unsigned char)blue);
-                                
+                            red =0; green=0; blue=0;
                         }
                     }
                     fclose(output);
