@@ -405,7 +405,11 @@ int main(int argc, char **argv)
                             if(fgetc(output)!= ' ')
                                 printf("no");
                             fscanf(output, "%d", &green);
+                            if(fgetc(output)!= ' ')
+                                printf("no");
                             fscanf(output, "%d", &blue);
+                            if(fgetc(output)!= ' ')
+                                printf("no");
                             new_image.setColor(j, i, (unsigned char)red, (unsigned char)green, (unsigned char)blue);
                                 
                         }
