@@ -20,6 +20,9 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "bmp.h"
+
+
 
 #define CODE_SIZE  12
 #define TRUE 1
@@ -36,6 +39,13 @@ struct TreeNode
     int pre_node;
     int next_node;
     int son_node;
+};
+
+struct TextChar
+{
+    char c;
+    struct TextChar * pre_char;
+    struct TextChar * next_char;
 };
 
 typedef struct TreeNode Tree[MAX_TREE_NODES];
@@ -78,12 +88,7 @@ void readfileheader(FILE *,char**,int *);
 void compress(FILE*, FILE*, Tree);
 void decompress(FILE*, FILE*, Tree);
 
-struct TextChar
-{
-    char c;
-    struct TextChar * pre_char;
-    struct TextChar * next_char;
-};
+
 
 struct TextChar * append(struct TextChar * P, char C)
 {
@@ -220,11 +225,11 @@ void freeText(struct TextChar * P)
 
 struct TextChar * newChar(char c)
 {
-    struct TextChar * new = (struct TextChar*)malloc(sizeof(struct TextChar));
-    new->c = c;
-    new->pre_char = NULL;
-    new->next_char = NULL;
-    return new;
+    struct TextChar * newC = (struct TextChar*)malloc(sizeof(struct TextChar));
+    newC->c = c;
+    newC->pre_char = NULL;
+    newC->next_char = NULL;
+    return newC;
 }
 
 int main(int argc, char **argv)
@@ -295,7 +300,132 @@ int main(int argc, char **argv)
 
             fclose(lzw_file);
             free(output_file_names);
-        }else
+        }
+        else if ( strcmp(argv[1],"-ic") == 0)
+        {
+            /* compression */
+            lzw_file = fopen(argv[2] ,"wb");
+
+            /* write the file header */
+            input_file_names = argv + 3;
+            no_of_file = argc - 3;
+            writefileheader(lzw_file,input_file_names,no_of_file);
+
+            /* ADD CODES HERE */
+            for(int i = 0; i<no_of_file; i++)
+            {
+                Bitmap image_data(input_file_names[i]);
+                const char * tmp_file_name = strcat(strtok(input_file_names[i], "."), ".txt");
+                FILE * tmp_file = fopen(tmp_file_name, "wb");
+                int width = image_data.getWidth();
+                int height = image_data.getHeight();
+                
+                unsigned char red, green, blue;
+                
+                for (int i = 0; i < height; i++)
+                {
+                    for (int j = 0; j < width; j++)
+                    {
+                        image_data.getColor(j, i, red, green, blue);
+                        
+                        //printf("%d ", red);
+                        fprintf(tmp_file, "%hhu ", red);
+                        fprintf(tmp_file, "%hhu ", green);
+                        fprintf(tmp_file, "%hhu ", blue);
+                        
+                    }
+                }
+                fclose(tmp_file);
+                
+                tmp_file = fopen(tmp_file_name, "rb");
+                
+                compress(tmp_file, lzw_file, tree);
+                fclose(tmp_file);
+                image_data.~Bitmap();
+            }
+            write_code(lzw_file, MAX_TREE_NODES-1, CODE_SIZE);
+
+            fclose(lzw_file);
+        }
+        else if ( strcmp(argv[1],"-id") == 0)
+        {
+
+            /* decompress */
+            lzw_file = fopen(argv[2] ,"rb");
+
+            /* read the file header */
+            no_of_file = 0;
+            readfileheader(lzw_file,&output_file_names,&no_of_file);
+
+            /* ADD CODES HERE */
+
+            int file_num = 0;
+            char * name;
+            name = strtok(output_file_names,"\n");
+
+            while (name!=NULL)
+            {
+                if(strlen(name)!=0)
+                {
+                    const char * tmp_file_name = strcat(strtok(name, "."),".txt");
+                    FILE * output = fopen(tmp_file_name, "w");
+                    decompress(lzw_file, output, tree);
+                    fclose(output);
+                }
+                file_num++;
+
+                if(file_num>=no_of_file)
+                    break;
+                name = strtok(NULL, "\n");
+            }
+
+            fclose(lzw_file);
+            
+            file_num = 0;
+            name = strtok(output_file_names,"\n");
+
+            while (name!=NULL)
+            {
+                if(strlen(name)!=0)
+                {
+                    const char * tmp_file_name = strcat(strtok(name, "."),".txt");
+                    FILE * output = fopen(tmp_file_name, "r");
+                    int height, width;
+                    int red, green , blue;
+                    printf("Please enter the height and the width of the %d-th image: <height> <width>", file_num+1);
+                    scanf("%d %d", &height, &width);
+                    getchar();
+                    Bitmap new_image(width, height);
+                    for(int i = 0; i<height; i++)
+                    {
+                        for(int j = 0; j<width; j++)
+                        {
+                            fscanf(output, "%d", &red);
+
+                            if(fgetc(output)!= ' ')
+                                printf("no");
+                            fscanf(output, "%d", &green);
+                            fscanf(output, "%d", &blue);
+                            new_image.setColor(j, i, (unsigned char)red, (unsigned char)green, (unsigned char)blue);
+                                
+                        }
+                    }
+                    fclose(output);
+                    new_image.save(name);
+                    new_image.~Bitmap();
+                }
+                file_num++;
+
+                if(file_num>=no_of_file)
+                    break;
+                name = strtok(NULL, "\n");
+            }
+            
+
+            free(output_file_names);
+
+        }
+        else
             printusage = 1;
     }else
         printusage = 1;
@@ -440,9 +570,11 @@ void compress(FILE *input, FILE *output, Tree tree)
     char C;
     struct TextChar * P = NULL;
     unsigned int X = 0;
+    int int_c;
 
-    while((C = fgetc(input))!=EOF)
+    while(( int_c = fgetc(input))!=EOF)
     {
+        C = (char) int_c;
         struct TextChar * PC = append(P, C);
         int code = findCode(PC, tree);
         free(PC);
