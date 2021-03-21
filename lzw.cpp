@@ -392,7 +392,7 @@ int main(int argc, char **argv)
                     FILE * output = fopen(tmp_file_name, "r");
                     int height, width;
                     int red, green , blue;
-                    printf("Please enter the height and the width of the %d-th image: <height> <width>", file_num+1);
+                    printf("Please enter the height and the width of the %d-th image: <height> <width>\n", file_num+1);
                     scanf("%d %d", &height, &width);
                     getchar();
                     Bitmap new_image(width, height);
@@ -411,7 +411,7 @@ int main(int argc, char **argv)
                         }
                     }
                     fclose(output);
-                    new_image.save(name);
+                    new_image.save(strcat(strtok(name, "."),".bmp"));
                     new_image.~Bitmap();
                 }
                 file_num++;
