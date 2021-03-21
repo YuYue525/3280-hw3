@@ -403,13 +403,13 @@ int main(int argc, char **argv)
                             fscanf(output, "%d", &red);
 
                             if(fgetc(output)!= ' ')
-                                printf("no");
+                                printf("red");
                             fscanf(output, "%d", &green);
                             if(fgetc(output)!= ' ')
-                                printf("no");
+                                printf("green");
                             fscanf(output, "%d", &blue);
                             if(fgetc(output)!= ' ')
-                                printf("no");
+                                printf("blue");
                             new_image.setColor(j, i, (unsigned char)red, (unsigned char)green, (unsigned char)blue);
                                 
                         }
