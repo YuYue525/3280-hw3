@@ -400,14 +400,13 @@ int main(int argc, char **argv)
                     {
                         for(int j = 0; j<width; j++)
                         {
-                            int num;
-                            
-                            while((num = fgetc(output))!=' ')
-                                red = red*10 +num-'0';
-                            while((num = fgetc(output))!=' ')
-                                green = green*10 +num-'0';
-                            while((num = fgetc(output))!=' ')
-                                blue = blue*10 +num-'0';
+                           
+                            fscanf(output, "%d", &red);
+                            fgetc(output);
+                            fscanf(output, "%d", &green);
+                            fgetc(output);
+                            fscanf(output, "%d", &blue);
+                            fgetc(output);
                             
                             new_image.setColor(j, i, (unsigned char)red, (unsigned char)green, (unsigned char)blue);
                             red =0; green=0; blue=0;
